@@ -5,9 +5,10 @@ import shutil
 def build_executable():
     subprocess.run([
         "pyinstaller",
-        "--name=file_move",
+        "--name=LDTPapp_backup",
+        "--onefile",
         "--windowed",
-        "LDTPapp_update.py"
+        "LDTPapp_backup.py"
     ])
 
     # 必要なファイルをdistフォルダにコピー
