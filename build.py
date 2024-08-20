@@ -7,7 +7,7 @@ def build_executable():
         "pyinstaller",
         "--name=file_move",
         "--windowed",
-        "file_move.py"
+        "LDTPapp_update.py"
     ])
 
     # 必要なファイルをdistフォルダにコピー
