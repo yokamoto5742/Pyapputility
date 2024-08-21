@@ -1,25 +1,11 @@
-import configparser
-import ctypes
-import logging
 import os
 import shutil
-import threading
-import tkinter as tk
-from ctypes import wintypes
+import configparser
+import logging
 from logging.handlers import TimedRotatingFileHandler
+import tkinter as tk
 from tkinter import ttk
-
-import win32event
-import winerror
-
-# Windows API 関数の定義
-MessageBox = ctypes.windll.user32.MessageBoxW
-MessageBox.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
-MessageBox.restype = wintypes.INT
-
-CloseHandle = ctypes.windll.kernel32.CloseHandle
-CloseHandle.argtypes = [wintypes.HANDLE]
-CloseHandle.restype = wintypes.BOOL
+import threading
 
 
 class Config:
@@ -135,7 +121,7 @@ class Application(tk.Tk):
         self.progress.stop()
         self.progress.pack_forget()
         self.label.config(text="Updateが完了しました")
-        self.geometry("300x70")
+        self.geometry("300x70")  # ウィンドウサイズを調整
         self.after(1500, self.close_application)
 
     def close_application(self):
@@ -143,24 +129,9 @@ class Application(tk.Tk):
 
 
 def main():
-    # ミューテックスを作成
-    mutex_name = "Global\\LDTPappUpdateMutex"
-    mutex = win32event.CreateMutex(None, False, mutex_name)
-    last_error = ctypes.get_last_error()
-
-    if last_error == winerror.ERROR_ALREADY_EXISTS:
-        logging.warning("LDTPapp Updateは既に実行中です。")
-        MessageBox(None, "LDTPapp Updateは既に実行中です。", "警告", 0)
-        return
-
-    try:
-        app = Application()
-        app.after(0, app.start_update)
-        app.mainloop()
-    finally:
-        # ミューテックスを解放
-        if mutex:
-            CloseHandle(mutex)
+    app = Application()
+    app.after(0, app.start_update)
+    app.mainloop()
 
 
 if __name__ == "__main__":
