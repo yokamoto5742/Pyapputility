@@ -3,6 +3,9 @@ import shutil
 import configparser
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import tkinter as tk
+from tkinter import ttk
+import threading
 
 
 class Config:
@@ -37,7 +40,6 @@ def setup_logging(config):
 
     console_handler = logging.StreamHandler()
 
-    # _internalを含むログを除外するフィルターを追加
     exclude_internal_filter = ExcludeInternalFilter()
     file_handler.addFilter(exclude_internal_filter)
     console_handler.addFilter(exclude_internal_filter)
@@ -79,26 +81,57 @@ def copy_files(src_dir, dest_dir):
         logging.error(f"ファイルのコピーに失敗しました: {src_dir} から {dest_dir} へ. エラー: {e}")
 
 
+class Application(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("LDTPapp Update")
+        self.geometry("300x100")
+        self.label = ttk.Label(self, text="Updateを実行中")
+        self.label.pack(pady=20)
+        self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=200, mode='indeterminate')
+        self.progress.pack(pady=10)
+
+    def start_update(self):
+        self.progress.start()
+        threading.Thread(target=self.run_update, daemon=True).start()
+
+    def run_update(self):
+        try:
+            config = Config()
+            setup_logging(config)
+            logging.info("LDTPappのupdateを開始します")
+
+            logging.info(f"削除を開始: {config.delete_dir}")
+            delete_files(config.delete_dir)
+            logging.info("削除完了")
+
+            logging.info(f"コピーを開始: {config.copy_src_dir} から {config.copy_dest_dir} へ")
+            copy_files(config.copy_src_dir, config.copy_dest_dir)
+            logging.info("コピー完了")
+
+        except configparser.Error as e:
+            logging.error(f"設定ファイルの読み込みに失敗しました: {e}")
+        except Exception as e:
+            logging.error(f"予期せぬエラーが発生しました: {e}")
+
+        logging.info("LDTPappのupdateを完了しました")
+        self.after(0, self.update_completed)
+
+    def update_completed(self):
+        self.progress.stop()
+        self.progress.pack_forget()
+        self.label.config(text="LDTPappのupdateを完了しました")
+        self.geometry("300x70")  # ウィンドウサイズを調整
+        self.after(1500, self.close_application)
+
+    def close_application(self):
+        self.destroy()
+
+
 def main():
-    try:
-        config = Config()
-        setup_logging(config)
-        logging.info("ファイル管理スクリプトを開始します")
-
-        logging.info(f"削除を開始: {config.delete_dir}")
-        delete_files(config.delete_dir)
-        logging.info("削除完了")
-
-        logging.info(f"コピーを開始: {config.copy_src_dir} から {config.copy_dest_dir} へ")
-        copy_files(config.copy_src_dir, config.copy_dest_dir)
-        logging.info("コピー完了")
-
-    except configparser.Error as e:
-        logging.error(f"設定ファイルの読み込みに失敗しました: {e}")
-    except Exception as e:
-        logging.error(f"予期せぬエラーが発生しました: {e}")
-
-    logging.info("ファイル管理スクリプトを終了します")
+    app = Application()
+    app.after(0, app.start_update)
+    app.mainloop()
 
 
 if __name__ == "__main__":
