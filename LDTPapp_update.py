@@ -121,7 +121,7 @@ class Application(tk.Tk):
         self.progress.stop()
         self.progress.pack_forget()
         self.label.config(text="Updateが完了しました")
-        self.geometry("300x70")  # ウィンドウサイズを調整
+        self.geometry("300x70")
         self.after(1500, self.close_application)
 
     def close_application(self):
