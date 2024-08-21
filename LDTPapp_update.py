@@ -1,11 +1,25 @@
+import configparser
+import ctypes
+import logging
 import os
 import shutil
-import configparser
-import logging
-from logging.handlers import TimedRotatingFileHandler
-import tkinter as tk
-from tkinter import ttk
 import threading
+import tkinter as tk
+from ctypes import wintypes
+from logging.handlers import TimedRotatingFileHandler
+from tkinter import ttk
+
+import win32event
+import winerror
+
+# Windows API 関数の定義
+MessageBox = ctypes.windll.user32.MessageBoxW
+MessageBox.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+MessageBox.restype = wintypes.INT
+
+CloseHandle = ctypes.windll.kernel32.CloseHandle
+CloseHandle.argtypes = [wintypes.HANDLE]
+CloseHandle.restype = wintypes.BOOL
 
 
 class Config:
@@ -129,9 +143,24 @@ class Application(tk.Tk):
 
 
 def main():
-    app = Application()
-    app.after(0, app.start_update)
-    app.mainloop()
+    # ミューテックスを作成
+    mutex_name = "Global\\LDTPappUpdateMutex"
+    mutex = win32event.CreateMutex(None, False, mutex_name)
+    last_error = ctypes.get_last_error()
+
+    if last_error == winerror.ERROR_ALREADY_EXISTS:
+        logging.warning("LDTPapp Updateは既に実行中です。")
+        MessageBox(None, "LDTPapp Updateは既に実行中です。", "警告", 0)
+        return
+
+    try:
+        app = Application()
+        app.after(0, app.start_update)
+        app.mainloop()
+    finally:
+        # ミューテックスを解放
+        if mutex:
+            CloseHandle(mutex)
 
 
 if __name__ == "__main__":
