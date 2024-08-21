@@ -114,13 +114,13 @@ class Application(tk.Tk):
         except Exception as e:
             logging.error(f"予期せぬエラーが発生しました: {e}")
 
-        logging.info("LDTPappのupdateを完了しました")
+        logging.info("LDTPappのupdateが完了しました")
         self.after(0, self.update_completed)
 
     def update_completed(self):
         self.progress.stop()
         self.progress.pack_forget()
-        self.label.config(text="LDTPappのupdateを完了しました")
+        self.label.config(text="Updateが完了しました")
         self.geometry("300x70")  # ウィンドウサイズを調整
         self.after(1500, self.close_application)
 
