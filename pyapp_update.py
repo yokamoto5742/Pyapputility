@@ -6,7 +6,7 @@ from logging.handlers import TimedRotatingFileHandler
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
-from typing import Dict, Optional, NoReturn
+from typing import Dict, Optional, NoReturn, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +17,13 @@ class AppConfig:
     delete_dir: str
     copy_src_dir: str
     copy_dest_dir: str
+
+
+class ExcludeInternalFilter(logging.Filter):
+    """内部メッセージをフィルタリングするためのロギングフィルター"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "_internal" not in record.getMessage()
 
 
 class ConfigManager:
@@ -47,39 +54,25 @@ class ConfigManager:
                 logging.error(f"Config section {section} is missing required key: {e}")
 
 
-class ExcludeInternalFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        return "_internal" not in record.getMessage()
-
-
-def setup_logging(config: ConfigManager) -> None:
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-
-    log_file = log_dir / "app_updates.log"
-    file_handler = TimedRotatingFileHandler(
-        log_file,
-        when="midnight",
-        interval=1,
-        backupCount=config.log_retention_days,
-        encoding='utf-8'
-    )
-    file_handler.suffix = "%Y%m%d"
-
-    console_handler = logging.StreamHandler()
-    exclude_internal_filter = ExcludeInternalFilter()
-
-    for handler in (file_handler, console_handler):
-        handler.addFilter(exclude_internal_filter)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[file_handler, console_handler]
-    )
-
-
 class UpdateManager:
+    @staticmethod
+    def verify_directories(app_config: AppConfig) -> Tuple[bool, str]:
+        """
+        ディレクトリの存在を確認します
+        戻り値: (bool: 全て存在するか, str: エラーメッセージ)
+        """
+        if not Path(app_config.copy_src_dir).exists():
+            return False, f"コピー元ディレクトリが見つかりません: {app_config.copy_src_dir}"
+
+        if not Path(app_config.delete_dir).exists():
+            return False, f"削除対象ディレクトリが見つかりません: {app_config.delete_dir}"
+
+        copy_dest_parent = Path(app_config.copy_dest_dir).parent
+        if not copy_dest_parent.exists():
+            return False, f"コピー先の親ディレクトリが見つかりません: {copy_dest_parent}"
+
+        return True, ""
+
     @staticmethod
     def delete_files(directory: str) -> None:
         for root, dirs, files in os.walk(directory, topdown=False):
@@ -118,18 +111,30 @@ class UpdateManager:
             logging.error(f"ファイルのコピーに失敗しました: {src_dir}から{dest_dir}へ. エラー: {e}")
 
     @classmethod
-    def update_app(cls, app_config: AppConfig) -> None:
+    def update_app(cls, app_config: AppConfig) -> Tuple[bool, str]:
         logging.info(f"{app_config.name}のアップデートを開始します")
 
-        logging.info(f"削除を開始: {app_config.delete_dir}")
-        cls.delete_files(app_config.delete_dir)
-        logging.info("削除完了")
+        # ディレクトリの事前確認
+        dirs_exist, error_msg = cls.verify_directories(app_config)
+        if not dirs_exist:
+            logging.error(error_msg)
+            return False, error_msg
 
-        logging.info(f"コピーを開始: {app_config.copy_src_dir}から{app_config.copy_dest_dir}へ")
-        cls.copy_files(app_config.copy_src_dir, app_config.copy_dest_dir)
-        logging.info("コピー完了")
+        try:
+            logging.info(f"削除を開始: {app_config.delete_dir}")
+            cls.delete_files(app_config.delete_dir)
+            logging.info("削除完了")
 
-        logging.info(f"{app_config.name}のアップデートが完了しました")
+            logging.info(f"コピーを開始: {app_config.copy_src_dir}から{app_config.copy_dest_dir}へ")
+            cls.copy_files(app_config.copy_src_dir, app_config.copy_dest_dir)
+            logging.info("コピー完了")
+
+            logging.info(f"{app_config.name}のアップデートが完了しました")
+            return True, "更新が完了しました"
+        except Exception as e:
+            error_msg = f"更新処理中にエラーが発生しました: {str(e)}"
+            logging.error(error_msg)
+            return False, error_msg
 
 
 class Application(tk.Tk):
@@ -193,16 +198,13 @@ class Application(tk.Tk):
         try:
             setup_logging(self.config_manager)
             app_config = self.config_manager.apps[self.selected_app]
-            UpdateManager.update_app(app_config)
-            self.after(0, self.update_completed, True)
-        except KeyError:
-            logging.error("アプリ設定が見つかりません")
-            self.after(0, self.update_completed, False)
+            success, message = UpdateManager.update_app(app_config)
+            self.after(0, self.update_completed, success, message)
         except Exception as e:
             logging.error(f"更新中にエラーが発生しました: {e}")
-            self.after(0, self.update_completed, False)
+            self.after(0, self.update_completed, False, str(e))
 
-    def update_completed(self, success: bool) -> None:
+    def update_completed(self, success: bool, message: str) -> None:
         self.progress.stop()
         self.progress.pack_forget()
 
@@ -210,7 +212,7 @@ class Application(tk.Tk):
             self.status_label.config(text=f"{self.selected_app}の更新が完了しました")
             self.after(1500, self.reset_ui)
         else:
-            messagebox.showerror("エラー", "更新中にエラーが発生しました。ログを確認してください。")
+            messagebox.showerror("エラー", f"更新に失敗しました: {message}")
             self.reset_ui()
 
     def reset_ui(self) -> None:
@@ -219,6 +221,33 @@ class Application(tk.Tk):
         self.app_combo.set('')
         self.update_button.config(state="disabled")
         self.status_label.config(text="更新するアプリを選択してください")
+
+
+def setup_logging(config: ConfigManager) -> None:
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    log_file = log_dir / "app_updates.log"
+    file_handler = TimedRotatingFileHandler(
+        log_file,
+        when="midnight",
+        interval=1,
+        backupCount=config.log_retention_days,
+        encoding='utf-8'
+    )
+    file_handler.suffix = "%Y%m%d"
+
+    console_handler = logging.StreamHandler()
+    exclude_internal_filter = ExcludeInternalFilter()
+
+    for handler in (file_handler, console_handler):
+        handler.addFilter(exclude_internal_filter)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[file_handler, console_handler]
+    )
 
 
 def main() -> NoReturn:
