@@ -5,13 +5,12 @@ import shutil
 def build_executable():
     subprocess.run([
         "pyinstaller",
-        "--name=LDTPapp_update",
+        "--name=pyapp_update",
         "--onefile",
         "--windowed",
-        "LDTPapp_update.py"
+        "pyapp_update.py"
     ])
 
-    # 必要なファイルをdistフォルダにコピー
     shutil.copy("config.ini", "dist/config.ini")
 
 
