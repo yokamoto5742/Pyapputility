@@ -116,7 +116,7 @@ class UpdateManager:
 class Application(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("アプリケーション更新ツール")
+        self.title("pyapp_update")
         self.geometry("400x200")
         self.config_manager = ConfigManager()
         self.selected_app: Optional[str] = None
@@ -127,7 +127,7 @@ class Application(tk.Tk):
         select_frame = ttk.Frame(self)
         select_frame.pack(pady=20)
 
-        ttk.Label(select_frame, text="更新するアプリケーション:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(select_frame, text="更新するアプリ:").pack(side=tk.LEFT, padx=5)
         self.app_combo = ttk.Combobox(
             select_frame,
             values=list(self.config_manager.apps.keys()),
@@ -154,13 +154,13 @@ class Application(tk.Tk):
         )
 
         # ステータスラベル
-        self.status_label = ttk.Label(self, text="更新するアプリケーションを選択してください")
+        self.status_label = ttk.Label(self, text="更新するアプリを選択してください")
         self.status_label.pack(pady=20)
 
     def on_app_selected(self, event):
         self.selected_app = self.app_combo.get()
         self.update_button.config(state="normal")
-        self.status_label.config(text=f"{self.selected_app}が選択されました")
+        self.status_label.config(text=f"{self.selected_app}を選択しました")
 
     def start_update(self):
         if not self.selected_app:
@@ -168,7 +168,7 @@ class Application(tk.Tk):
 
         self.update_button.config(state="disabled")
         self.app_combo.config(state="disabled")
-        self.status_label.config(text=f"{self.selected_app}の更新を実行中...")
+        self.status_label.config(text=f"{self.selected_app}を更新中...")
         self.progress.pack(pady=10)
         self.progress.start()
 
@@ -200,7 +200,7 @@ class Application(tk.Tk):
         self.selected_app = None
         self.app_combo.set('')
         self.update_button.config(state="disabled")
-        self.status_label.config(text="更新するアプリケーションを選択してください")
+        self.status_label.config(text="更新するアプリを選択してください")
 
 
 def main():
