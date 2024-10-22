@@ -10,10 +10,10 @@ import glob
 def get_config_path():
     if getattr(sys, 'frozen', False):
         # 実行可能ファイルとして実行されている場合
-        return os.path.join(os.path.dirname(sys.executable), 'config.ini')
+        return os.path.join(os.path.dirname(sys.executable), 'LDTPapp_backup.ini')
     else:
         # 通常のPythonスクリプトとして実行されている場合
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'LDTPapp_backup.ini')
 
 
 # 設定ファイルの読み込み

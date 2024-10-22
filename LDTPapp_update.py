@@ -11,7 +11,7 @@ import threading
 class Config:
     def __init__(self):
         self.config = configparser.ConfigParser()
-        self.config.read('config.ini', encoding='utf-8')
+        self.config.read('LDTPapp_update.ini', encoding='utf-8')
         self.delete_dir = self.config['Directories']['DeleteDir']
         self.copy_src_dir = self.config['Directories']['CopySrcDir']
         self.copy_dest_dir = self.config['Directories']['CopyDestDir']
@@ -28,7 +28,7 @@ def setup_logging(config):
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    log_file = os.path.join(log_dir, "file_operations.log")
+    log_file = os.path.join(log_dir, "LDTPapp_file_operations.log")
     file_handler = TimedRotatingFileHandler(
         log_file,
         when="midnight",
