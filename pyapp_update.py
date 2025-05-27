@@ -8,7 +8,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from logging.handlers import TimedRotatingFileHandler
 from tkinter import messagebox, ttk
-from typing import Dict, NoReturn, Optional, Tuple
+from typing import Dict, NoReturn, Optional, Tuple, Callable
 
 
 @dataclass
@@ -55,26 +55,39 @@ class ConfigManager:
 class UpdateManager:
     @staticmethod
     def verify_directories(app_config: AppConfig) -> Tuple[bool, str]:
-        if not Path(app_config.copy_src_dir).exists():
+        if not pathlib.Path(app_config.copy_src_dir).exists():
             return False, f"コピー元ディレクトリが見つかりません: {app_config.copy_src_dir}"
 
-        if not Path(app_config.delete_dir).exists():
+        if not pathlib.Path(app_config.delete_dir).exists():
             return False, f"削除対象ディレクトリが見つかりません: {app_config.delete_dir}"
 
-        copy_dest_parent = Path(app_config.copy_dest_dir).parent
+        copy_dest_parent = pathlib.Path(app_config.copy_dest_dir).parent
         if not copy_dest_parent.exists():
             return False, f"コピー先の親ディレクトリが見つかりません: {copy_dest_parent}"
 
         return True, ""
 
     @staticmethod
-    def delete_files(directory: str) -> None:
+    def count_files(directory: str) -> int:
+        count = 0
+        for root, dirs, files in os.walk(directory):
+            count += len(files)
+        return count
+
+    @staticmethod
+    def delete_files(directory: str, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> None:
+        total_files = UpdateManager.count_files(directory)
+        processed_files = 0
+
         for root, dirs, files in os.walk(directory, topdown=False):
             for name in files:
-                file_path = Path(root) / name
+                file_path = pathlib.Path(root) / name
                 try:
                     file_path.unlink()
                     logging.info(f"ファイルを削除しました: {file_path}")
+                    processed_files += 1
+                    if progress_callback:
+                        progress_callback(processed_files, total_files, f"削除中: {name}")
                 except PermissionError:
                     logging.error(f"権限エラー: {file_path}の削除ができません")
                 except FileNotFoundError:
@@ -83,7 +96,7 @@ class UpdateManager:
                     logging.error(f"ファイルの削除に失敗しました: {file_path}. エラー: {e}")
 
             for name in dirs:
-                dir_path = Path(root) / name
+                dir_path = pathlib.Path(root) / name
                 try:
                     dir_path.rmdir()
                     logging.info(f"ディレクトリを削除しました: {dir_path}")
@@ -93,20 +106,56 @@ class UpdateManager:
                     logging.error(f"ディレクトリの削除に失敗しました: {dir_path}. エラー: {e}")
 
     @staticmethod
-    def copy_files(src_dir: str, dest_dir: str) -> None:
+    def copy_files(src_dir: str, dest_dir: str,
+                   progress_callback: Optional[Callable[[int, int, str], None]] = None) -> None:
+        src_path = pathlib.Path(src_dir)
+        dest_path = pathlib.Path(dest_dir)
+
+        # コピーするファイル数をカウント
+        total_files = UpdateManager.count_files(src_dir)
+        processed_files = 0
+
         try:
-            shutil.copytree(src_dir, dest_dir, dirs_exist_ok=True, copy_function=shutil.copy2)
-            logging.info(f"ファイルをコピーしました: {src_dir} から {dest_dir} へ")
+            # コピー先ディレクトリを作成
+            dest_path.mkdir(parents=True, exist_ok=True)
+
+            # ファイルを一つずつコピー
+            for root, dirs, files in os.walk(src_dir):
+                # 相対パスを計算
+                rel_root = pathlib.Path(root).relative_to(src_path)
+                dest_root = dest_path / rel_root
+
+                # ディレクトリを作成
+                dest_root.mkdir(parents=True, exist_ok=True)
+
+                # ファイルをコピー
+                for file in files:
+                    src_file = pathlib.Path(root) / file
+                    dest_file = dest_root / file
+
+                    try:
+                        shutil.copy2(src_file, dest_file)
+                        processed_files += 1
+                        if progress_callback:
+                            progress_callback(processed_files, total_files, f"コピー中: {file}")
+                        logging.info(f"ファイルをコピーしました: {src_file} -> {dest_file}")
+                    except Exception as e:
+                        logging.error(f"ファイルのコピーに失敗: {src_file} -> {dest_file}. エラー: {e}")
+
         except PermissionError:
             logging.error(f"権限エラー: {src_dir}から{dest_dir}へのコピーができません")
         except FileNotFoundError:
             logging.error(f"ディレクトリが見つかりません: {src_dir}または{dest_dir}")
-        except shutil.Error as e:
+        except Exception as e:
             logging.error(f"ファイルのコピーに失敗しました: {src_dir}から{dest_dir}へ. エラー: {e}")
 
     @classmethod
-    def update_app(cls, app_config: AppConfig) -> Tuple[bool, str]:
+    def update_app(cls, app_config: AppConfig, progress_callback: Optional[Callable[[int, str], None]] = None) -> Tuple[
+        bool, str]:
         logging.info(f"{app_config.name}のアップデートを開始します")
+
+        if progress_callback:
+            progress_callback(10, "ディレクトリを確認中...")
 
         dirs_exist, error_msg = cls.verify_directories(app_config)
         if not dirs_exist:
@@ -114,13 +163,34 @@ class UpdateManager:
             return False, error_msg
 
         try:
+            if progress_callback:
+                progress_callback(20, "削除を開始中...")
+
             logging.info(f"削除を開始: {app_config.delete_dir}")
-            cls.delete_files(app_config.delete_dir)
+
+            def delete_progress(current, total, filename):
+                if progress_callback:
+                    percent = 20 + int((current / total) * 40)  # 20%から60%まで
+                    progress_callback(percent, f"削除中: {filename}")
+
+            cls.delete_files(app_config.delete_dir, delete_progress)
             logging.info("削除完了")
 
+            if progress_callback:
+                progress_callback(60, "コピーを開始中...")
+
             logging.info(f"コピーを開始: {app_config.copy_src_dir}から{app_config.copy_dest_dir}へ")
-            cls.copy_files(app_config.copy_src_dir, app_config.copy_dest_dir)
+
+            def copy_progress(current, total, filename):
+                if progress_callback:
+                    percent = 60 + int((current / total) * 35)  # 60%から95%まで
+                    progress_callback(percent, f"コピー中: {filename}")
+
+            cls.copy_files(app_config.copy_src_dir, app_config.copy_dest_dir, copy_progress)
             logging.info("コピー完了")
+
+            if progress_callback:
+                progress_callback(100, "更新完了")
 
             logging.info(f"{app_config.name}のアップデートが完了しました")
             return True, "更新が完了しました"
@@ -134,7 +204,7 @@ class Application(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("pyapp_update")
-        self.geometry("300x200")
+        self.geometry("300x250")
         self.config_manager = ConfigManager()
         self.selected_app: Optional[str] = None
         self.setup_ui()
@@ -164,7 +234,8 @@ class Application(tk.Tk):
             self,
             orient=tk.HORIZONTAL,
             length=300,
-            mode='indeterminate'
+            mode='determinate',
+            maximum=100
         )
 
         self.status_label = ttk.Label(self, text="更新するアプリを選択してください")
@@ -183,22 +254,29 @@ class Application(tk.Tk):
         self.app_combo.config(state="disabled")
         self.status_label.config(text=f"{self.selected_app}を更新中...")
         self.progress.pack(pady=10)
-        self.progress.start()
+        self.progress['value'] = 0
 
         threading.Thread(target=self.run_update, daemon=True).start()
+
+    def update_progress(self, value: int, message: str) -> None:
+        self.progress['value'] = value
+        self.status_label.config(text=message)
 
     def run_update(self) -> None:
         try:
             setup_logging(self.config_manager)
             app_config = self.config_manager.apps[self.selected_app]
-            success, message = UpdateManager.update_app(app_config)
+
+            def progress_callback(percent: int, message: str):
+                self.after(0, self.update_progress, percent, message)
+
+            success, message = UpdateManager.update_app(app_config, progress_callback)
             self.after(0, self.update_completed, success, message)
         except Exception as e:
             logging.error(f"更新中にエラーが発生しました: {e}")
             self.after(0, self.update_completed, False, str(e))
 
     def update_completed(self, success: bool, message: str) -> None:
-        self.progress.stop()
         self.progress.pack_forget()
 
         if success:
@@ -217,7 +295,7 @@ class Application(tk.Tk):
 
 
 def setup_logging(config: ConfigManager) -> None:
-    log_dir = Path("logs")
+    log_dir = pathlib.Path("logs")
     log_dir.mkdir(exist_ok=True)
 
     log_file = log_dir / "app_updates.log"
