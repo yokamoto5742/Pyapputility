@@ -1,14 +1,14 @@
-import os
-import shutil
 import configparser
 import logging
-from logging.handlers import TimedRotatingFileHandler
-import tkinter as tk
-from tkinter import ttk, messagebox
+import os
+import pathlib
+import shutil
 import threading
-from typing import Dict, Optional, NoReturn, Tuple
+import tkinter as tk
 from dataclasses import dataclass
-from pathlib import Path
+from logging.handlers import TimedRotatingFileHandler
+from tkinter import messagebox, ttk
+from typing import Dict, NoReturn, Optional, Tuple
 
 
 @dataclass
@@ -20,8 +20,6 @@ class AppConfig:
 
 
 class ExcludeInternalFilter(logging.Filter):
-    """内部メッセージをフィルタリングするためのロギングフィルター"""
-
     def filter(self, record: logging.LogRecord) -> bool:
         return "_internal" not in record.getMessage()
 
@@ -57,10 +55,6 @@ class ConfigManager:
 class UpdateManager:
     @staticmethod
     def verify_directories(app_config: AppConfig) -> Tuple[bool, str]:
-        """
-        ディレクトリの存在を確認します
-        戻り値: (bool: 全て存在するか, str: エラーメッセージ)
-        """
         if not Path(app_config.copy_src_dir).exists():
             return False, f"コピー元ディレクトリが見つかりません: {app_config.copy_src_dir}"
 
@@ -114,7 +108,6 @@ class UpdateManager:
     def update_app(cls, app_config: AppConfig) -> Tuple[bool, str]:
         logging.info(f"{app_config.name}のアップデートを開始します")
 
-        # ディレクトリの事前確認
         dirs_exist, error_msg = cls.verify_directories(app_config)
         if not dirs_exist:
             logging.error(error_msg)
