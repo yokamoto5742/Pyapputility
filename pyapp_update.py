@@ -171,7 +171,7 @@ class UpdateManager:
             def delete_progress(current, total, filename):
                 if progress_callback:
                     percent = 20 + int((current / total) * 40)  # 20%から60%まで
-                    progress_callback(percent, f"削除中: {filename}")
+                    progress_callback(percent, f"現在{percent}%完了")
 
             cls.delete_files(app_config.delete_dir, delete_progress)
             logging.info("削除完了")
@@ -184,7 +184,7 @@ class UpdateManager:
             def copy_progress(current, total, filename):
                 if progress_callback:
                     percent = 60 + int((current / total) * 35)  # 60%から95%まで
-                    progress_callback(percent, f"コピー中: {filename}")
+                    progress_callback(percent, f"現在{percent}%完了")
 
             cls.copy_files(app_config.copy_src_dir, app_config.copy_dest_dir, copy_progress)
             logging.info("コピー完了")
