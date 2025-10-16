@@ -7,10 +7,9 @@ def build_executable():
         "pyinstaller",
         "--name=pyapp_update",
         "--windowed",
+        "--add-data", "utils/config.ini;.",
         "pyapp_update.py"
     ])
-
-    shutil.copy("config.ini", "dist/config.ini")
 
 
 if __name__ == "__main__":
