@@ -111,12 +111,10 @@ class UpdateManager:
         src_path = pathlib.Path(src_dir)
         dest_path = pathlib.Path(dest_dir)
 
-        # コピーするファイル数をカウント
         total_files = UpdateManager.count_files(src_dir)
         processed_files = 0
 
         try:
-            # コピー先ディレクトリを作成
             dest_path.mkdir(parents=True, exist_ok=True)
 
             # ファイルを一つずつコピー
@@ -125,10 +123,8 @@ class UpdateManager:
                 rel_root = pathlib.Path(root).relative_to(src_path)
                 dest_root = dest_path / rel_root
 
-                # ディレクトリを作成
                 dest_root.mkdir(parents=True, exist_ok=True)
 
-                # ファイルをコピー
                 for file in files:
                     src_file = pathlib.Path(root) / file
                     dest_file = dest_root / file
@@ -230,13 +226,7 @@ class Application(tk.Tk):
         )
         self.update_button.pack(pady=10)
 
-        self.progress = ttk.Progressbar(
-            self,
-            orient=tk.HORIZONTAL,
-            length=300,
-            mode='determinate',
-            maximum=100
-        )
+        self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=300)
 
         self.status_label = ttk.Label(self, text="更新するアプリを選択してください")
         self.status_label.pack(pady=20)
@@ -299,13 +289,8 @@ def setup_logging(config: ConfigManager) -> None:
     log_dir.mkdir(exist_ok=True)
 
     log_file = log_dir / "app_updates.log"
-    file_handler = TimedRotatingFileHandler(
-        log_file,
-        when="midnight",
-        interval=1,
-        backupCount=config.log_retention_days,
-        encoding='utf-8'
-    )
+    file_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=config.log_retention_days,
+                                            encoding='utf-8')
     file_handler.suffix = "%Y%m%d"
 
     console_handler = logging.StreamHandler()

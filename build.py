@@ -6,7 +6,6 @@ def build_executable():
     subprocess.run([
         "pyinstaller",
         "--name=pyapp_update",
-        "--onefile",
         "--windowed",
         "pyapp_update.py"
     ])
