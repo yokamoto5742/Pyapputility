@@ -1,13 +1,11 @@
 import subprocess
-import shutil
-
 
 def build_executable():
     subprocess.run([
         "pyinstaller",
         "--name=pyapp_update",
         "--windowed",
-        "--add-data", "utils/config.ini;.",
+        "--add-data", "config.ini;.",
         "pyapp_update.py"
     ])
 
