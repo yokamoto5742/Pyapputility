@@ -3,10 +3,11 @@ import subprocess
 def build_executable():
     subprocess.run([
         "pyinstaller",
-        "--name=pyapp_update",
+        "--name=pyfilecleaner",
         "--windowed",
+        "--onefile",
         "--add-data", "config.ini;.",
-        "pyapp_update.py"
+        "pyfilecleaner.py"
     ])
 
 
